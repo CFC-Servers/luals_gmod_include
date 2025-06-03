@@ -1,6 +1,11 @@
 # luals_gmod_include
 Proper GMod `include` support for LuaLS 🙌
+
 _(`include` will properly recognize the type of the object returned from `include` 🎉)_
+
+- 👉 [Installation](https://github.com/CFC-Servers/luals_gmod_include?tab=readme-ov-file#installation)
+- 👉 [Technical Details](https://github.com/CFC-Servers/luals_gmod_include?tab=readme-ov-file#technical-details)
+
 
 ## Showcase
 Let's say you have a project like this:
@@ -50,11 +55,6 @@ For example, LuaLS is happily unaware that this code will error:
 But, with proper `include` support, LuaLS is smart enough to catch that situation 😌:
 
 ![image](https://github.com/user-attachments/assets/f1161a7d-e02a-4314-973f-5007924d8395)
-
-
-
-
-This plugin 
 
 
 ## Installation
