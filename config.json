@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/LLS-Addons/main/schemas/addon_config.schema.json",
+  "name": "garrysmod_include",
+  "words": [ "include%s*%(?" ],
+  "settings": {
+    "runtime.version": "LuaJIT",
+    "Lua.runtime.special": {
+      "include": "require",
+      "IncludeCS": "require"
+    }
+  }
+}
