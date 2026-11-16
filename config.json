@@ -3,7 +3,8 @@
   "name": "garrysmod_include",
   "words": [ "include%s*%(?" ],
   "settings": {
-    "runtime.version": "LuaJIT",
+    "Lua.runtime.version": "LuaJIT",
+    "Lua.diagnostics.disable": [ "different-requires" ],
     "Lua.runtime.special": {
       "include": "require",
       "IncludeCS": "require"

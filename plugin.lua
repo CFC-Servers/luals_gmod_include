@@ -1,42 +1,90 @@
 local fs = require( "bee.filesystem" )
+local furi = require( "file-uri" )
+local files = require( "files" )
 
-local existsCache = {}
+local luaRootNames = { "lua", "gamemodes" }
 
---- Remove first 7 characters (file:///)
---- @param uri string
---- @return boolean
-local function uriExists( uri )
-    local cached = existsCache[uri]
-    if cached ~= nil then
-        return cached
+local skipIncludeNames = {
+    __newindex = function( cache, name, result )
+        if string.sub( name, -4 ) == ".lua" then return end
+        rawset( cache, name, result )
     end
+}
 
-    local path = uri:sub( 8 )
-    local exists = fs.exists( path )
+--- @param name string
+--- @return string
+local function encodeIncludeName( name )
+    local forwardSlashed = name:gsub( "\\", "/" )
+    local encoded = furi.encode( forwardSlashed ):gsub( "^file:/*", "" )
 
-    existsCache[uri] = exists
-    return exists
+    return encoded
 end
 
-function ResolveRequire( uri, name )
+--- @param uri string
+--- @return string
+local function collapseDotSegments( uri )
+    uri = uri:gsub( "/%.%f[/]", "" )
+
+    local collapsed
+    repeat
+        uri, collapsed = uri:gsub( "/[^/]+/%.%./", "/", 1 )
+    until collapsed == 0
+
+    return uri
+end
+
+--- @param baseURI string
+--- @param encodedName string
+--- @return string?
+local function existingURI( baseURI, encodedName )
+    local uri = collapseDotSegments( baseURI .. "/" .. encodedName )
+    if not fs.exists( furi.decode( uri ) ) then return nil end
+
+    return files.getRealUri( uri )
+end
+
+--- @param scopeURI string?
+--- @param encodedName string
+--- @return string[]
+local function findUnderAnyLuaRoot( scopeURI, encodedName )
+    local matches = {}
+
+    for knownURI in files.eachFile( scopeURI ) do
+        for _, rootName in ipairs( luaRootNames ) do
+            local suffix = "/" .. rootName .. "/" .. encodedName
+
+            if knownURI:sub( -#suffix ) == suffix then
+                matches[#matches + 1] = knownURI
+            end
+        end
+    end
+
+    return matches
+end
+
+function ResolveRequire( scopeURI, name )
     if string.sub( name, -4 ) ~= ".lua" then return nil end
 
     -- https://github.com/LuaLS/LuaLS.github.io/issues/48
-    local _callingName, callingURI = debug.getlocal( 5, 2 ) do
-        assert( _callingName == "suri", "Something broke! Did LuaLS update?" )
-    end
+    local managerName, manager = debug.getlocal( 5, 1 )
+    local callingName, callingURI = debug.getlocal( 5, 2 )
+    assert( managerName == "self" and callingName == "suri", "Something broke! Did LuaLS update?" )
 
-    -- Get everything up to and including the last forward slash.
+    -- LuaLS caches results by name alone, but a relative include resolves differently per calling file
+    setmetatable( manager.requireCache, skipIncludeNames )
+
+    local encodedName = encodeIncludeName( name )
+
     local callingDirURI = callingURI:match( "^(.*)/[^/]*$" )
+    local relative = existingURI( callingDirURI, encodedName )
+    if relative then return { relative } end
 
-    -- Relative to the calling file
-    local relative = callingDirURI .. "/" .. name
-    if uriExists( relative ) then
-        return { relative }
+    for _, rootName in ipairs( luaRootNames ) do
+        local ownRootURI = callingURI:match( "^(.*/" .. rootName .. ")/" )
+        local underOwnRoot = ownRootURI and existingURI( ownRootURI, encodedName )
+
+        if underOwnRoot then return { underOwnRoot } end
     end
 
-    -- Relative to the top level lua/ dir
-    local absolute = uri .. "/lua/" .. name
-    return { absolute }
+    return findUnderAnyLuaRoot( scopeURI, encodedName )
 end
-
